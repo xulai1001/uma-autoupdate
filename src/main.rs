@@ -1,32 +1,92 @@
+use anyhow::{anyhow, Result};
 use reqwest::blocking::Client;
 use reqwest::header::REFERER;
+use std::collections::HashMap;
+use std::default::Default;
 use std::io::{Read, Write};
-use std::error::Error;
+use std::str::FromStr;
 use std::{fs, io, env};
-use std::io::ErrorKind;
 use std::path::Path;
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, Local};
 use yansi::Paint;
+use indicatif;
+use toml::{Value, Table};
+use serde::{Deserialize, Serialize};
 
-// Box<dyn Error>可以返回任何错误，属于使用指针的运行时多态，而且具有所有权
-fn get_local_ver() -> Result<i64, Box<dyn Error>> {
-    let path = "db/version";
-    if Path::new(path).exists() {
-        let line = fs::read_to_string(path)?;   // line is String
-        let datetime = line.parse::<DateTime<FixedOffset>>()?; // turbofish annotation
-        println!("本地: {}", datetime);
-        let timestamp = datetime.timestamp();
-        Ok(timestamp)
-    } else {
-        // ?对应Try trait，Err的Try trait调用From trait对异常类型进行自动转换，把括号里的内容装箱变成Box<Error>
-        // 相当于Err(Box::from(Error::new(x)))省略了装箱过程
-        Err(io::Error::new(ErrorKind::NotFound, path))?
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct UpdateInfo {
+    /// 文件列表
+    pub filelist: Vec<String>,
+    /// 文件列表中第一个文件的Hash，可选
+    pub sha1: Option<String>,
+    /// URA目录文件列表，可选
+    pub filelist_ura: Option<Vec<String>>
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct VersionToml {
+    /// 配置表
+    pub conf: HashMap<String, UpdateInfo>,
+    /// 版本
+    pub version: HashMap<String, String>
+}
+
+impl TryFrom<Table> for VersionToml {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Table) -> Result<Self, Self::Error> {
+        let mut ret = VersionToml {
+            ..Default::default()
+        };
+        for (k, v) in value.iter() {
+            match k.as_str() {
+                "version" => ret.version = v.clone().try_into()?,
+                _ => {
+                    let conf: UpdateInfo = v.clone().try_into()?;
+                    ret.conf.insert(k.clone(), conf);
+                }
+            }
+        }
+        Ok(ret)
     }
 }
 
-fn get_remote_ver() -> Result<i64, Box<dyn Error>> {
-    let base_url = "https://cdn2.viktorlab.cn";
-    let url = format!("{base_url}/version");
+impl FromStr for VersionToml {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let table: Table = toml::from_str(s)?;
+        let ret = VersionToml::try_from(table)?;
+        Ok(ret)
+    }
+}
+
+
+// 获取%localappdata%/下的URA存储目录，如有则返回字符串
+fn get_ura_path() -> Result<Option<String>> {
+    let ura_path = format!("{}/UmamusumeResponseAnalyzer", env::var("LOCALAPPDATA")?);
+    if Path::new(&ura_path).exists() {
+        Ok(Some(ura_path))
+    } else {
+        Ok(None)
+    }
+}
+
+// 获取本地配置文件
+fn get_local_conf() -> Result<Option<VersionToml>> {
+    let path = "version.toml";
+    if Path::new(path).exists() {
+        let content = fs::read_to_string(path)?;
+        let ret = VersionToml::from_str(&content)?;
+        Ok(Some(ret))
+    } else {
+        Ok(None)
+    }
+}
+/*
+fn get_remote_conf() -> Result<Version> {
+    let base_url = "https://cdn2.viktorlab.cn/uma";
+    let url = format!("{base_url}/version.toml");
     let referer = "https://viktorlab.cn";
 
     let cli = Client::new();
@@ -35,15 +95,14 @@ fn get_remote_ver() -> Result<i64, Box<dyn Error>> {
     if resp.status().is_success() {
         let mut content = String::new();
         resp.read_to_string(&mut content)?;
-        let datetime: DateTime<FixedOffset> = content.parse()?;
-        println!("最新: {}", datetime);
-        Ok(datetime.timestamp())
+        let value: Version = toml::from_str(&content)?;
+        Ok(value)
     } else {
-        Err(resp.status().to_string())? // 同理，Err?把String转为Error并装箱，最终变成Box<Error>了
+        Err(anyhow!("HTTP error: {}", resp.status()))
     }
 }
 
-fn download() -> Result<(), Box<dyn Error>> {
+fn download() -> Result<()> {
     let files = vec!["version", "umaDB.json", "cardDB.json"];
     let base_url = "https://cdn2.viktorlab.cn";
     let base_path = "db";
@@ -59,25 +118,38 @@ fn download() -> Result<(), Box<dyn Error>> {
             outf.write_all(&bytes)?;
             println!("下载 {}", f.cyan());
         } else {
-            Err(format!("{} -> {}", f.red(), resp.status().to_string()))?
+            return Err(anyhow!("{} -> {}", f.red(), resp.status().to_string()))
         }
     }
     println!("{}", "更新完毕".green());
     Ok(())
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let path = env::current_dir()?;
-    println!("当前工作目录: {}", path.display());
+fn update_ai(filelist: &Vec<String>) -> Result<()> {
+    let base_url = "https://cdn2.viktorlab.cn";
+    let base_path = "ai";
+    let referer = "https://viktorlab.cn";
+    let cli = Client::new();
 
-    let remote_ver = get_remote_ver()?;
-    let local_ver = get_local_ver().unwrap_or(0);
-    if local_ver < remote_ver {
-        download()?;
-    } else {
-        println!("{}", "已经是最新版本".green());
-    }
+    println!("{}", "正在更新AI数据...".green());
+    let pb = indicatif::ProgressBar::new(filelist.len() as u64);
+    
+}
+*/
+fn main() -> Result<()> {
+    let path = env::current_dir()?;
+    println!("当前工作目录: {:?}", path);
+
+//    let remote_conf = get_remote_conf()?;
+    let local_conf = get_local_conf()?;
+
+    println!("{:#?}", local_conf);
+    
+  //  if local_conf.is_none() || remote_conf.ai.newer_than(local_conf.unwrap().ai) {
+  //      update_ai(&remote_conf.ai.filelist);
+  //  }
     println!("按回车键退出...");
     let _ = io::stdin().read(&mut [0u8; 1]);    // 只会读size个字节
+
     Ok(())
 }

@@ -1,0 +1,32 @@
+# 更新配置，固定，提交时手动生成
+# AI本体
+[ai]
+filelist = [ "UmaAI.exe" ]
+sha1 = ""
+
+# 小黑板
+[ura]
+filelist = [ "UmamusumeResponseAnalyzer.exe" ]
+sha1 = ""
+
+# AI数据
+[ai_data]
+filelist = [ "db/cardDB.json", "db/umaDB.json" ]
+
+# URA数据，放在ura数据文件夹
+[ura_data]
+filelist = [ "" ]
+filelist_ura = [ "events.br" ]
+
+# 更新程序自身
+[auto_update]
+filelist = [ "uma-autoupdate.exe" ]
+sha1 = ""
+
+# 版本号，每次git push时由脚本在后面追加
+[version]
+ai = "2024-05-05T12:21:14+08:00"
+ura = "2024-05-05T12:21:14+08:00"
+ai_data = "2024-05-05T12:21:14+08:00"
+ura_data = "2024-05-05T12:21:14+08:00"
+auto_update = "2024-05-05T12:21:14+08:00"
