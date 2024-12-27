@@ -1,0 +1,36 @@
+# AI本体
+[ai]
+name = "UmaAI"
+filelist = [ "UmaAI.exe" ]
+sha1 = ""
+ver = "0.2.1-utf8"
+date = "2024-05-05"
+
+# 小黑板
+[ura]
+name = "小黑板"
+filelist = [ "UmamusumeResponseAnalyzer.exe" ]
+sha1 = ""
+ver = "1.3.31"
+date = "2024-05-05"
+
+# AI数据
+[ai_data]
+name = "AI数据"
+filelist = [ "db/cardDB.json", "db/umaDB.json", "db/text_data.json" ]
+date = "2024-05-05"
+
+# URA数据，放在ura数据文件夹
+[ura_data]
+name = "小黑板数据"
+filelist = [ "" ]
+filelist_ura = [ "events.br" ]
+date = "2024-05-05"
+
+# 更新程序自身
+[auto_update]
+name = "更新工具"
+filelist = [ "uma-autoupdate.exe" ]
+sha1 = ""
+ver = "0.1.0"
+date = "2024-05-05"

@@ -1,4 +1,5 @@
 mod app;
+mod version_data;
 
 use app::*;
 use leptos::prelude::*;

@@ -2,6 +2,8 @@ use leptos::task::spawn_local;
 use leptos::{ev::SubmitEvent, prelude::*};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
+use crate::version_data::*;
+
 
 #[wasm_bindgen]
 extern "C" {
@@ -28,14 +30,20 @@ pub fn App() -> impl IntoView {
         ev.prevent_default();
         spawn_local(async move {
             let name = name.get_untracked();
-            if name.is_empty() {
-                return;
-            }
+            //if name.is_empty() {
+            //    return;
+            //}
 
-            let args = serde_wasm_bindgen::to_value(&GreetArgs { name: &name }).unwrap();
+            //let args = serde_wasm_bindgen::to_value(&GreetArgs { name: &name }).unwrap();
             // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-            let new_msg = invoke("greet", args).await.as_string().unwrap();
-            set_greet_msg.set(new_msg);
+            //let new_msg = invoke("greet", args).await.as_string().unwrap();
+            set_greet_msg.set("waiting".to_string());
+            let ret = invoke(
+                "get_version_data",
+                wasm_bindgen::JsValue::NULL
+            ).await;
+            let version_data: Option<VersionData> = serde_wasm_bindgen::from_value(ret).unwrap();
+            set_greet_msg.set(serde_json::to_string(&version_data).unwrap());
         });
     };
 
@@ -59,9 +67,10 @@ pub fn App() -> impl IntoView {
                     placeholder="Enter a name..."
                     on:input=update_name
                 />
-                <button type="submit">"Greet"</button>
+                <button type="submit">"检查更新"</button>
             </form>
             <p>{ move || greet_msg.get() }</p>
+
         </main>
     }
 }
