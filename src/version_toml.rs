@@ -18,6 +18,8 @@ pub struct VersionInfo {
     pub date: String,
     /// 文件列表
     pub filelist: Vec<String>,
+    /// 显示顺序
+    pub index: u32,
     /// URA目录文件列表，可选
     pub filelist_ura: Option<Vec<String>>,
     /// 文件列表中第一个文件的Hash，可选
@@ -38,8 +40,16 @@ pub struct VersionData {
     pub remote: Option<VersionToml>
 }
 
+impl VersionData {
+    /// 按remote - local - None的顺序返回一个有效配置
+    pub fn pick(&self) -> Option<&VersionToml> {
+        self.remote.as_ref()
+            .or(self.local.as_ref())
+    }
+}
+
 /// 获取本地配置文件
-fn get_local_conf() -> Result<Option<VersionToml>> {
+pub fn get_local_conf() -> Result<Option<VersionToml>> {
     let path = "version.toml";
     if Path::new(path).exists() {
         let content = fs::read_to_string(path)?;
@@ -51,7 +61,7 @@ fn get_local_conf() -> Result<Option<VersionToml>> {
 }
 
 /// 获取远程配置文件
-fn get_remote_conf() -> Result<VersionToml> {
+pub fn get_remote_conf() -> Result<VersionToml> {
     let base_url = "https://cdn2.viktorlab.cn/uma";
     let url = format!("{base_url}/version.toml");
     let referer = "https://viktorlab.cn";
