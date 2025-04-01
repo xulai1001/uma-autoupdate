@@ -1,11 +1,12 @@
 [package]
 name = "uma-autoupdate"
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 
 [profile.release]
 opt-level = 'z'
 lto = true
+strip = true
 
 [build-dependencies]
 winres = "0.1.12"

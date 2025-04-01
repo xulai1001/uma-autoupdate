@@ -14,7 +14,7 @@ date = "2025-02-11 13:54:57"
 filelist = ["uma-autoupdate.exe"]
 index = 6
 sha1 = "7ce26b28b2030522b17b4e98debf6f3d9e62ccca"
-ver = "0.1.0"
+ver = "0.1.2"
 
 [ura_data]
 name = "小黑板数据"

@@ -1,10 +1,9 @@
 use crate::utils::*;
 use anyhow::{anyhow, Result};
 use chrono::{NaiveDate, NaiveDateTime};
-use log::info;
+use log::{info, warn};
 use reqwest::{header::REFERER, Client};
 use serde::{Deserialize, Serialize};
-use sha1::{Digest, Sha1};
 use std::collections::HashMap;
 use std::default::Default;
 use std::io::Write;
@@ -21,7 +20,7 @@ pub struct VersionInfo {
     pub index: u32,
     /// 文件列表
     pub filelist: Vec<String>,
-    /// 文件列表中第一个文件的Hash，可选
+    /// 文件列表中第一个文件的Hash，实际不可空
     pub sha1: Option<String>,
     /// 完整压缩包名，可选
     pub package: Option<String>,
@@ -48,24 +47,50 @@ impl VersionInfo {
     pub fn verify(&self) -> bool {
         if let Some(sha1) = self.sha1.as_deref() {
             let filename = format!("{}.autoupdate", self.filelist[0]);
-            if let Ok(contents) = std::fs::read(&filename) {
-                let mut hasher = Sha1::new();
-                hasher.update(&contents);
-                let result = hasher.finalize();
-                let result_text = to_hex(&result);
-                info!("File: {filename}, SHA1: {result_text}");
-            }
+            match get_file_sha1(&filename) {
+                Ok(digest) => {
+                    if digest != sha1 {
+                        warn!("{filename} SHA1错误");
+                    }
+                }
+                Err(e) => {
+                    warn!("计算{filename} SHA1时出错: {e:?}");
+                }
+            } 
         }
         true
     }
 
-    pub fn install(&self) -> Result<()> {
+    pub fn get_install_dir(&self) -> Result<String> {
         let mut install_path = self.install_path.as_deref().unwrap_or(".").to_string();
         if install_path.contains("%localappdata%") {
             let data_path = env::var("LOCALAPPDATA")?;
             info!("local-app-data: {data_path}");
             install_path = install_path.replace("%localappdata%", &data_path);
         }
+        Ok(install_path)
+    }
+
+    pub fn get_local_sha1(&self) -> Result<Option<String>> {
+        let install_dir = self.get_install_dir()?;
+        // 拿name判断一下, emm...
+        let local_name = if self.name == "自动更新工具" {
+            get_exe_name()?.replace(".\\", "")
+        } else {
+            self.filelist[0].clone()
+        };
+        let filename = format!("{}/{}", install_dir, &local_name);
+        if fs::exists(&filename)? {
+            let digest = get_file_sha1(&filename)?;
+            Ok(Some(digest))
+        } else {
+            info!("本地文件 {local_name} 不存在.");
+            Ok(None)
+        }
+    }
+
+    pub fn install(&self) -> Result<()> {
+        let install_path = self.get_install_dir()?;
         if !fs::exists(&install_path)? {
             info!("新建目录 {install_path}");
             fs::create_dir_all(&install_path)?;
@@ -74,7 +99,7 @@ impl VersionInfo {
             let tempfile = format!("{filename}.autoupdate");
             if fs::exists(&tempfile)? {
                 let new_file = PathBuf::from(&install_path).join(filename);
-                info!("{tempfile} -> {new_file:?}");
+                info!("Copy {tempfile} -> {new_file:?}");
                 // windows的限制，只能复制+删除，不能rename
                 fs::copy(&tempfile, &new_file)?;
                 fs::remove_file(&tempfile)?;

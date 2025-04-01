@@ -49,7 +49,7 @@ pub fn main() -> iced::Result {
     // 删除旧版
     let _ = remove_old();
 
-    iced::application("UmaAI 自动更新工具 0.1.1", MainWindow::update, MainWindow::view)
+    iced::application("UmaAI 自动更新工具 0.1.3 250401", MainWindow::update, MainWindow::view)
         .subscription(MainWindow::subscription)
         .theme(|_| Theme::CatppuccinLatte)
         .settings(settings)
@@ -173,25 +173,25 @@ impl MainWindow {
                     .and_modify(|count| *count -= 1);
                 if self.in_progress[&d.key] == 0 {
                     // 下载完成
-                    let w = self.widgets
+                    let mut w = self.widgets
                         .clone()
                         .into_iter()
                         .find(|w| w.key == d.key)
                         .expect("widget not found");
                     if w.verify() {
                         self.version_data.update_and_save(&d.key)?;
-                        self.load(self.version_data.clone());
                         if d.key == "auto_update" {
                             replace_self()?;
                         } else {
                             w.replace()?;
                         }
+                        self.load(self.version_data.clone());
                     } else {
                         let err = format!("{} 更新文件校验错误，请联系管理员", w.key);
                         return Ok(Task::done(Message::text(&err)));
                     }
                 }
-                Ok(Task::done(Message::text(&format!("下载完成 - {}", d.filename))))
+                Ok(Task::done(Message::text(&format!("更新完成 - {}", d.filename))))
             }
             _ => Ok(Task::none())
         }

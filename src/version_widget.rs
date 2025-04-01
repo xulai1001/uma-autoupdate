@@ -6,6 +6,7 @@ use anyhow::{anyhow, Result};
 use iced::widget::{button, container, row, text};
 use iced::{Center, Color, Element, Fill, FillPortion, Shadow, Vector};
 use serde::{Deserialize, Serialize};
+use log::info;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct VersionWidget {
@@ -14,6 +15,7 @@ pub struct VersionWidget {
     pub index: u32,
     pub local: Option<VersionInfo>,
     pub remote: Option<VersionInfo>,
+    pub local_sha1: Option<String>
 }
 
 fn get_update_time(opt: &Option<VersionInfo>) -> String {
@@ -71,6 +73,7 @@ impl VersionWidget {
             .as_ref()
             .and_then(|remote| remote.get(key))
             .cloned();
+        let local_sha1 = remote.as_ref().and_then(|r| r.get_local_sha1().unwrap_or(None));
         let pick = remote.as_ref().or(local.as_ref());
         let index = pick.map(|v| v.index).unwrap_or(0);
         let name = pick.map(|v| v.name.clone()).unwrap_or(key.to_string());
@@ -80,14 +83,15 @@ impl VersionWidget {
             index,
             local,
             remote,
+            local_sha1
         }
     }
 
-    pub fn needs_update(&self) -> bool {
-        match (&self.local, &self.remote) {
-            (Some(local), Some(remote)) => remote.newer_than(local),
-            (None, Some(_)) => true,
-            _ => false,
+    pub fn needs_update(&self) -> (bool, &'static str) {
+        match (self.local_sha1.as_deref(), self.remote.as_ref().and_then(|r| r.sha1.as_deref())) {
+            (Some(l), Some(r)) if l == r => (false, "已经是最新版本"),
+            (_, None) => (false, "未连接到更新服务器"),
+            _ => (true, "需要更新"),
         }
     }
     pub fn view(&self) -> Element<Message> {
@@ -97,19 +101,25 @@ impl VersionWidget {
             .height(Fill)
             .align_y(Center);
 
+       // let local_row = def_align!(
+       //     container(text!("本地版本: {}", get_update_time(&self.local))),
+       //     3
+       // )
+       // .style(|_| bg_style(Color::from_rgba8(128, 255, 128, 0.85)));
+        let (needs_update, reason) = self.needs_update();
         let local_row = def_align!(
-            container(text!("本地版本: {}", get_update_time(&self.local))),
-            3
-        )
-        .style(|_| bg_style(Color::from_rgba8(128, 255, 128, 0.85)));
-
+            container(text!("{reason}")), 3
+        ).style(|_|
+            bg_style(Color::from_rgba8(128, 255, 128, 0.85))
+        );
         let remote_row = def_align!(
             container(text!("最新版本: {}", get_update_time(&self.remote))),
             3
-        )
-        .style(|_| bg_style(Color::from_rgba8(192, 0, 255, 0.85)));
+        ).style(|_|
+            bg_style(Color::from_rgba8(192, 0, 255, 0.85))
+        );
 
-        let on_press_msg = if self.needs_update() {
+        let on_press_msg = if needs_update {
             Some(Message::OnClickUpdate(self.clone()))
         } else {
             None
@@ -129,10 +139,13 @@ impl VersionWidget {
     pub fn verify(&self) -> bool {
         self.remote.as_ref().map(|x| x.verify()).unwrap_or(false)
     }
-    pub fn replace(&self) -> Result<()> {
+    pub fn replace(&mut self) -> Result<()> {
         self.remote
             .as_ref()
             .map(|x| x.install())
-            .unwrap_or(Err(anyhow!("未获取远程版本")))
+            .unwrap_or(Err(anyhow!("未获取远程版本")))?;
+        self.local_sha1 = self.remote.as_ref().and_then(|r| r.get_local_sha1().unwrap_or(None));
+        info!("After replace: Local {:?}", self.local_sha1);
+        Ok(())
     }
 }
